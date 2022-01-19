@@ -1,123 +1,70 @@
 #BY SUBMITTING THIS FILE TO CARMEN, I CERTIFY THAT I STRICTLY ADHERED TO THE
 #TENURES OF THE OHIO STATE UNIVERSITY’S ACADEMIC INTEGRITY POLICY.
 
+#function prints the values in a given structure in a neat formatted way
 
-#function reads in command line arguments, allocates memory for structures
-#opens file, then calls the necessary functions and frees and closes file
+.file "printlines.s"
+.section .rodata
 
-.file "readrec.s"
-.globl main
-        .type main, @function
+printf_message:
+.string "%d + %d = %d \n"
 
-printf_error:
-.string "Incorrect number of command line arguments \n"
 
-read: #for fopen call
-.string "r"
-
+.globl printlines #required directive for every function
+        .type printlines, @function #required directive 
 
 .text
-main:
-        pushq %rbp   #stack housekeeping
-        movq %rsp, %rbp
+printlines:
 
-        #rdi has number of command line arguments 
-        #rsi has char **argc
+	push %rbp               # save caller's %rbp
+        movq %rsp, %rbp         # copy %rsp to %rbp so our stack frame is ready to use
 
-        # check if rdi is 3
-        cmpq $3,%rdi
-        jne printError # if incorrect number, jump to error stuff
+	#rdi has struct Record *rptr
+	#rsi has int count 
+	movq $0,%rdx #set struct byte allignment offset to 0
 
-	#getting corret value of rsi
-	#rsi + 8 gives address
-	#call atoi, put address in first param spot 
-	movq 8(%rsi),%rdi # rsi + 8, this is the address to give to atoi
-	pushq %rsi
-	pushq %rdi #number of command line args
+	loop:
+
+	# value 1
+	leaq 16(%rdi),%r8 #16 bytes past the start of the struct for value 1
+	addq %rdx,%r8 # add this to offset address to go to the next struct
+
+	#value 2
+	leaq (%rdi),%r9 # p+0 for value 2 
+	addq %rdx,%r9 
+
+	#value 3
+	leaq 8(%rdi),%r10 # p + 8 for value 3
+	addq %rdx,%r10
+
+
+	#print
+	pushq %rdx #struct byte allignment amount
+	pushq %rsi #count
+	pushq %rdi #struct ptr
 	
-	call atoi #rdi contains the first paramenter which is the address, so just call
-	
+	movq $printf_message,%rdi # move printf message to first param
+	movq (%r8),%rsi  # dereference and move all struct values to param
+	movq (%r9),%rdx  # spots before calling printf
+	movq (%r10),%rcx 
+
+	movq $0,%rax # must set rax to 0 before printf
+	call printf
+
 	popq %rdi
-	popq %rsi	
-
-	movq %rax,%rdi #rax now contains value to pass to malloc, move to rdi to work with
-	movq %rdi,%rdx #copy that number to rdx because we will need to pass it later
-	
-	
-	#allocate memory
-	#number of structures * size of structure is amount of mem  
-	# call malloc with 24*number of structures
-	shlq $3,%rdi #8*num
-	leaq (%rdi,%rdi,2),%rdi # 3*num, so now 24*num	
-
-	pushq %rdx # rdx (number of records)
-	pushq %rsi
-	call malloc #rax now contains struct Record *rptr to pass to functions
 	popq %rsi
 	popq %rdx
 
-	#open the file
-	pushq %rax # save the Record *rptr
-	pushq %rdx # save the number of records 
-	
-	movq 16(%rsi),%rdi # putting file name in 1 param
-	movq $read,%rsi # putting "r" in second param
 
-	call fopen #rax now contains the file ptr
-	movq %rax,%rdi # put file ptr in the 1st param 
-	
-	popq %rdx #num of records
-	popq %rax #record ptr
+	addq $24,%rdx # for struct byte allignment
+	decq %rsi # decrement count
+	testq %rsi,%rsi 
+	jne loop # loop if not 0
 
-	movq %rax,%rsi # put record ptr in the 2nd param
-	#num of records is already in 3rd param
 
-	#call functions
-	pushq %rdi # save fptr
-	pushq %rsi # save record ptr
-	pushq %rdx # save count
 
-	call readlines
 
-	popq %rdx
-	popq %rsi
-	popq %rdi
-
-	movq %rdi,%rcx # put the fptr in rcx for closing later
-	movq %rsi,%rdi # put record ptr in 1st param 
-	movq %rdx,%rsi # put count in 2nd param
-
-	pushq %rdi # save record ptr
-	pushq %rsi # save count
-	pushq %rcx # save file pointer
-		
-	call printlines
-
-	popq %rcx 
-	popq %rsi
-	popq %rdi
-
-	pushq %rcx
-
-	#free memory 
-	call free #rdi contains record ptr
-	popq %rcx #file pointer
-
-	#close file
-	movq %rcx,%rdi # move file pointer to first param 
-	call fclose
-
-	jmp end #if we're here we don't want to print error stuff so jmp over it
-
-        printError: # to deal with error
-        movq $printf_error,%rdi
-        movq $0,%rax
-        call printf # don't care about registers getting messed up becasue we leave right after 
-        #if we're here we will go straigt to leave anyway
-
-	end:
-
-leave 
+leave
 ret
-.size main,.-main
+.size printlines,.-printlines
 
